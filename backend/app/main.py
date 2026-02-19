@@ -13,12 +13,13 @@ from app.core.constants import FEED_UPDATE_INTERVAL_HOURS
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
-# Ensure phish feed update logs are visible (uvicorn often sets root to WARNING)
-if not logger.handlers:
+# Ensure all app logs (including detection/LLM) are visible (uvicorn often sets root to WARNING)
+_root = logging.getLogger()
+if not _root.handlers:
     _h = logging.StreamHandler(sys.stderr)
     _h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
-    logger.addHandler(_h)
-logger.setLevel(logging.INFO)
+    _root.addHandler(_h)
+_root.setLevel(logging.INFO)
 
 
 def _run_phish_feed_update() -> None:

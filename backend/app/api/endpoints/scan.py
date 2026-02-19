@@ -46,7 +46,14 @@ def scan_email(request: ScanRequest) -> ScanResponse:
         "processing_ms": processing_ms,
         "links_found": len(parsed.links),
         "sender_domain": parsed.sender_domain,
+        "llm_used": result.get("llm_used", False),
     }
+    if result.get("llm_confidence") is not None:
+        metadata["llm_confidence"] = result["llm_confidence"]
+    if result.get("llm_label") is not None:
+        metadata["llm_label"] = result["llm_label"]
+    if result.get("llm_reasons"):
+        metadata["llm_reasons"] = result["llm_reasons"]
     if settings.phish_db_path:
         try:
             from app.reputation.openphish import get_last_updated

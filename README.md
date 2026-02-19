@@ -113,3 +113,46 @@ python -c "import sqlite3; c=sqlite3.connect('data/phish_urls.db'); r=c.execute(
 - If the DB is missing or empty: run `python -m app.tasks.update_phish_feed` first (it creates the file and downloads the feed).
 
 After the first run, scan responses may include `metadata.feed_last_updated` with the last feed update time.
+
+### LLM (optional)
+
+When the **rule-based verdict is Suspicious** (confidence between 0.4 and 0.7), the backend can optionally call an LLM to analyze the email (subject, sender, body) and return a second opinion. The **final label and confidence stay rule-based**; the LLM result is returned only in `metadata` for the addon to display (e.g. ?LLM thinks: Phishing (0.8)?).
+
+**When the LLM runs:** only if the aggregator verdict is **Suspicious**. Safe and Phishing verdicts do not trigger the LLM.
+
+**Choose one provider** via environment variable (in `.env` or `backend/.env`):
+
+| Env variable   | Description |
+|----------------|-------------|
+| `LLM_PROVIDER` | `ollama` (default) or `gemini` |
+
+**Ollama** (local):
+
+| Variable         | Default                  | Description        |
+|------------------|--------------------------|--------------------|
+| `OLLAMA_URL`     | `http://localhost:11434` | Ollama API base    |
+| `OLLAMA_MODEL`   | `llama2`                 | Model name         |
+| `LLM_TIMEOUT_SEC`| `30`                     | Request timeout (s)|
+
+**Gemini** (Google):
+
+| Variable         | Default            | Description        |
+|------------------|--------------------|--------------------|
+| `GEMINI_API_KEY` | (required)         | API key            |
+| `GEMINI_MODEL`   | `gemini-1.5-flash` | Model name         |
+| `LLM_TIMEOUT_SEC`| `30`               | Request timeout (s)|
+
+**Response when LLM ran:** in `metadata` you get:
+
+- `llm_used`: `true`
+- `llm_confidence`: 0?1 risk score from the model
+- `llm_label`: `"safe"` / `"suspicious"` / `"phishing"` (derived from `llm_confidence` using the same thresholds: ?0.7 ? phishing, ?0.4 ? suspicious, else safe)
+- `llm_reasons`: short explanation lines from the model (e.g. `["LLM (ollama): Urgent language.", ...]`)
+
+If the LLM is not invoked (verdict Safe/Phishing) or the call fails, `llm_used` is `false` and `llm_confidence` / `llm_label` / `llm_reasons` are omitted. The rule-based result is unchanged.
+
+**Logging:** when the server runs with default logging, you?ll see lines such as:
+
+- `LLM: invoking (verdict=Suspicious)`
+- `LLM: result provider=ollama risk_score=0.65 reasons_count=2`
+- On failure: `LLM: no provider succeeded, using rule-only result` or `LLM: invocation failed, using rule-only result: ...`

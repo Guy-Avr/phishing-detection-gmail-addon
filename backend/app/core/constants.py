@@ -12,6 +12,7 @@ RULE_WEIGHTS: dict[str, float] = {
     "language": 1.0,
     "html": 1.0,
     "openphish": 1.0,
+    "llm": 1.0,
 }
 
 PHISHING_THRESHOLD: float = 0.7
