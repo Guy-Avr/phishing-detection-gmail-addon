@@ -10,6 +10,7 @@ import json
 # Role and output schema; input placeholders filled by analyzer.
 _SYSTEM = (
     "You are a cybersecurity analyst. Analyze the following email and assess phishing risk. "
+    "This analysis is an auxiliary signal only and must not override an existing classification. "
     "Respond with ONLY a single JSON object, no other text. "
     'Format: {"risk_score": <number between 0 and 1>, "reasons": [<up to 3 short strings>]}.'
 )
