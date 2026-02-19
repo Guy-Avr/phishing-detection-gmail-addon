@@ -6,20 +6,59 @@ from app.core.constants import (
     BRAND_SIMILARITY_THRESHOLD,
     FREE_EMAIL_DOMAINS,
     KNOWN_BRANDS,
+    SENDER_WEIGHT_DOMAIN_SPOOF,
+    SENDER_WEIGHT_EXACT_BRAND_ON_FREE,
+    SENDER_WEIGHT_SIMILAR_NOT_EXACT,
 )
 from app.detection.rules.base import BaseRule, RuleResult
 from app.parsing.email_parser import ParsedEmail
 
 
-def _sender_uses_brand_on_free_email(sender: str, domain: str) -> str | None:
-    """Check if sender address on a free email domain contains a brand name."""
-    if domain not in FREE_EMAIL_DOMAINS:
-        return None
-    local = sender.split("@")[0] if "@" in sender else sender
+def _local_exact_brand(local: str) -> str | None:
+    """True if local part contains the exact brand name (e.g. paypal in paypal-support)."""
+    local_lower = local.lower()
     for brand in KNOWN_BRANDS:
-        if brand in local:
-            return f"Free email '{domain}' with brand name '{brand}' in address"
+        if brand in local_lower:
+            return f"Free email with exact brand name '{brand}' in address"
     return None
+
+
+def _local_resembles_brand_not_exact(local: str) -> str | None:
+    """Local part resembles a brand but is not exact (e.g. paypa1, natflix) => clearly fake."""
+    local = local.lower()
+    segments = [local]
+    for sep in (".", "-", "_"):
+        segments = [p for s in segments for p in s.split(sep)]
+    seen: set[str] = set()
+    for segment in segments:
+        if len(segment) < 3 or segment in seen:
+            continue
+        seen.add(segment)
+        for brand in KNOWN_BRANDS:
+            if segment == brand:
+                continue  # exact = handled by _local_exact_brand, lower weight
+            ratio = SequenceMatcher(None, segment, brand).ratio()
+            if ratio >= BRAND_SIMILARITY_THRESHOLD:
+                return f"Free email with brand-like address '{segment}' (not exact match of '{brand}')"
+    return None
+
+
+def _sender_free_email_checks(sender: str, domain: str) -> list[tuple[str, float]]:
+    """Returns list of (reason, weight) for free-email sender. Empty if not free email."""
+    if domain not in FREE_EMAIL_DOMAINS:
+        return []
+    local = sender.split("@")[0] if "@" in sender else sender
+    out: list[tuple[str, float]] = []
+    # Similar but not exact => 1.0 (clearly fake)
+    similar = _local_resembles_brand_not_exact(local)
+    if similar:
+        out.append((f"Free email '{domain}': {similar}", SENDER_WEIGHT_SIMILAR_NOT_EXACT))
+        return out  # already max; no need to add exact
+    # Exact brand in address => 0.5 (suspicious but could be support)
+    exact = _local_exact_brand(local)
+    if exact:
+        out.append((f"Free email '{domain}': {exact}", SENDER_WEIGHT_EXACT_BRAND_ON_FREE))
+    return out
 
 
 def _domain_resembles_brand(domain: str) -> str | None:
@@ -42,20 +81,20 @@ class SenderRule(BaseRule):
 
     def evaluate(self, email: ParsedEmail) -> RuleResult | None:
         if not email.sender or not email.sender_domain:
-            return None
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
-        reasons: list[str] = []
+        weighted: list[tuple[str, float]] = []
 
-        brand_on_free = _sender_uses_brand_on_free_email(email.sender, email.sender_domain)
-        if brand_on_free:
-            reasons.append(brand_on_free)
+        for reason, w in _sender_free_email_checks(email.sender, email.sender_domain):
+            weighted.append((reason, w))
 
         domain_spoof = _domain_resembles_brand(email.sender_domain)
         if domain_spoof:
-            reasons.append(domain_spoof)
+            weighted.append((domain_spoof, SENDER_WEIGHT_DOMAIN_SPOOF))
 
-        if not reasons:
-            return None
+        if not weighted:
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
-        score = min(1.0, 0.5 * len(reasons))
-        return RuleResult(rule_id=self.rule_id, score=score, reasons=reasons)
+        reasons = [r for r, _ in weighted]
+        score = min(1.0, sum(w for _, w in weighted))
+        return RuleResult(rule_id=self.rule_id, score=round(score, 4), reasons=reasons)

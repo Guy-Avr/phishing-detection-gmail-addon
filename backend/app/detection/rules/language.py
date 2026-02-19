@@ -15,12 +15,12 @@ class LanguageRule(BaseRule):
     def evaluate(self, email: ParsedEmail) -> RuleResult | None:
         text = f"{email.subject} {email.body_text}"
         if not text.strip():
-            return None
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
         words = text.split()
         word_count = len(words)
         if word_count == 0:
-            return None
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
         found: list[str] = []
         for phrase in URGENCY_PHRASES:
@@ -28,7 +28,7 @@ class LanguageRule(BaseRule):
                 found.append(phrase)
 
         if not found:
-            return None
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
         hit_count = len(found)
         ratio = hit_count / word_count

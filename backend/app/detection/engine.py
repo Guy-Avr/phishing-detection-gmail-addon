@@ -5,6 +5,7 @@ Receives ParsedEmail, runs each rule, collects RuleResults (skips None),
 optionally checks links against OpenPhish feed DB, then delegates to aggregator.
 """
 
+from app.core.enums import Verdict
 from app.detection.aggregator import aggregate
 from app.detection.rules.base import BaseRule, RuleResult
 from app.parsing.email_parser import ParsedEmail
@@ -58,6 +59,11 @@ class DetectionEngine:
                 pass
 
         verdict, confidence, reasons, signals = aggregate(results)
+
+        # OpenPhish match => link is known malicious => force Phishing, confidence 1
+        if any(r.rule_id == "openphish" and r.score >= 1.0 for r in results):
+            verdict = Verdict.PHISHING
+            confidence = 1.0
 
         return {
             "label": verdict,

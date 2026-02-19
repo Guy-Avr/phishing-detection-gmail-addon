@@ -5,7 +5,12 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from app.core.constants import SHORTENER_DOMAINS
+from app.core.constants import (
+    LINK_WEIGHT_ANCHOR_MISMATCH,
+    LINK_WEIGHT_IP,
+    LINK_WEIGHT_SHORTENER,
+    SHORTENER_DOMAINS,
+)
 from app.detection.rules.base import BaseRule, RuleResult
 from app.parsing.email_parser import ParsedEmail
 
@@ -48,26 +53,24 @@ class LinksRule(BaseRule):
     weight = 1.0
 
     def evaluate(self, email: ParsedEmail) -> RuleResult | None:
-        if not email.links:
-            return None
-
         reasons: list[str] = []
-        flags = 0
+        score_sum = 0.0
 
-        for url in email.links:
-            if _has_ip_host(url):
-                reasons.append(f"Link contains raw IP address: {url}")
-                flags += 1
-            if _is_shortener(url):
-                reasons.append(f"Link uses URL shortener: {url}")
-                flags += 1
+        if email.links:
+            for url in email.links:
+                if _has_ip_host(url):
+                    reasons.append(f"Link contains raw IP address: {url}")
+                    score_sum += LINK_WEIGHT_IP
+                if _is_shortener(url):
+                    reasons.append(f"Link uses URL shortener: {url}")
+                    score_sum += LINK_WEIGHT_SHORTENER
 
         mismatches = _find_anchor_mismatches(email.body_html)
         reasons.extend(mismatches)
-        flags += len(mismatches)
+        score_sum += len(mismatches) * LINK_WEIGHT_ANCHOR_MISMATCH
 
-        if flags == 0:
-            return None
+        if score_sum <= 0:
+            return RuleResult(rule_id=self.rule_id, score=0.0, reasons=[])
 
-        score = min(1.0, 0.3 * flags)
-        return RuleResult(rule_id=self.rule_id, score=score, reasons=reasons)
+        score = min(1.0, score_sum)
+        return RuleResult(rule_id=self.rule_id, score=round(score, 4), reasons=reasons)

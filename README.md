@@ -57,6 +57,36 @@ From the `backend` folder (with venv activated):
 pytest
 ```
 
+### How scoring works
+
+All tuning is in `backend/app/core/constants.py`.
+
+**1. Final confidence (0?1)**  
+Links, sender, language, html always run and return a score (0 when no signals); openphish is added only when a link matches the threat feed.  
+`confidence = clamp( (sum of score_i * rule_weight_i) / (sum of rule_weight_i) , 0, 1)`  
+Rule weights: `RULE_WEIGHTS` (links, sender, language, html, openphish), default 1.0 each.
+
+**Override:** If any email link is in the OpenPhish feed ? **confidence = 1.0** and **verdict = Phishing** (regardless of other rules).
+
+**2. Verdict**  
+- confidence >= 0.7 ? **Phishing**  
+- confidence >= 0.4 and < 0.7 ? **Suspicious**  
+- else ? **Safe**  
+Thresholds: `PHISHING_THRESHOLD`, `SUSPICIOUS_THRESHOLD`.
+
+**3. Per-rule score (0?1)**
+
+| Rule | Logic | Tuning in constants |
+|------|--------|----------------------|
+| **links** | Sum of weights per signal, cap 1.0. Signals: IP host (0.5), shortener (0.3), anchor mismatch (0.5). Mismatch = display text looks like a URL but href points elsewhere; plain "click me" is not counted. | `LINK_WEIGHT_*`, `SHORTENER_DOMAINS` |
+| **html** | Sum of weights per signal, cap 1.0. Signals: form (0.3), hidden input (0.55), inline JS (0.3), script tag (0.4). | `HTML_WEIGHT_*`, `SUSPICIOUS_JS_ATTRS` |
+| **language** | Ratio of urgency phrases to word count; higher ratio ? higher score. | `URGENCY_PHRASES` |
+| **sender** | Sum of weights per signal, cap 1.0. **Exact** brand on free email (e.g. paypal@gmail.com) = 0.5. **Distorted** name = 1.0: local part (e.g. paypa1) or domain (e.g. paypa1.com, natflix.com) similar to brand but not exact. | `SENDER_WEIGHT_*`, `FREE_EMAIL_DOMAINS`, `KNOWN_BRANDS`, `BRAND_SIMILARITY_THRESHOLD` |
+| **openphish** | If any email link is in the threat-feed DB ? score 1.0 and confidence is forced to 1.0. | Feed path: `PHISH_DB_PATH` |
+
+**4. Response**  
+`signals` = each rule's score; `reasons` = lines from rules that fired, ordered by score.
+
 ### OpenPhish threat feed
 
 The scanner checks links against a local SQLite DB of known phishing URLs (OpenPhish Community Feed). The DB path is set via `PHISH_DB_PATH` (default: `data/phish_urls.db`).
