@@ -1,5 +1,7 @@
 # phishing-detection-gmail-addon
 
+Technical design: [docs/TECHNICAL_SPECIFICATION.md](docs/TECHNICAL_SPECIFICATION.md)
+
 ## Running the project
 
 ### 1. Go to the backend folder
@@ -54,3 +56,30 @@ From the `backend` folder (with venv activated):
 ```bash
 pytest
 ```
+
+### OpenPhish threat feed
+
+The scanner checks links against a local SQLite DB of known phishing URLs (OpenPhish Community Feed). The DB path is set via `PHISH_DB_PATH` (default: `data/phish_urls.db`).
+
+**The feed updates automatically** while the server is running: first run 30 seconds after startup, then every 12 hours (configurable via `FEED_UPDATE_INTERVAL_HOURS` in `app/core/constants.py`).
+
+To update manually (e.g. without starting the server, or to force an update), from the `backend` folder:
+
+```bash
+python -m app.tasks.update_phish_feed
+```
+
+You should see something like: `Updated phish DB: 12345 URLs, last_updated=2025-02-19T...`
+
+**Check that it works (no SQLite knowledge needed):**
+
+From the `backend` folder, after running the update once:
+
+```bash
+python -c "import sqlite3; c=sqlite3.connect('data/phish_urls.db'); r=c.execute('SELECT last_updated, urls_count FROM feed_metadata WHERE id=1').fetchone(); print('Last updated:', r[0], '| URLs in DB:', r[1]); print('Sample URL:', c.execute('SELECT url FROM phish_urls LIMIT 1').fetchone()[0])"
+```
+
+- If the DB exists and was updated: you get `Last updated: ... | URLs in DB: <number>` and a sample URL.
+- If the DB is missing or empty: run `python -m app.tasks.update_phish_feed` first (it creates the file and downloads the feed).
+
+After the first run, scan responses may include `metadata.feed_last_updated` with the last feed update time.

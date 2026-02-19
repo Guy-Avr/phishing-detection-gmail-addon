@@ -1,1 +1,1 @@
-# Database connections, models, migrations
+# Database: phish URL store (SQLite) for OpenPhish feed lookup

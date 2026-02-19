@@ -1,1 +1,1 @@
-# Core configurations, security, settings
+# Core: configuration, constants, enums
