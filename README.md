@@ -57,6 +57,46 @@ From the `backend` folder (with venv activated):
 pytest
 ```
 
+### Gmail Add-on
+
+The add-on lives in the `addon/` folder and works with the backend scan API. It does not run any detection itself; it sends the current email?s raw content to `POST /scan` and shows the result (label, confidence, reasons, and optional LLM opinion).
+
+**Setup**
+
+1. **Backend running**  
+   Start the backend (e.g. `uvicorn app.main:app --reload`) so it is reachable at a URL the add-on can call (see step 3).
+
+2. **Create an Apps Script project**  
+   - Go to [script.google.com](https://script.google.com) and create a new project.  
+   - In Project Settings, enable ?Show appsscript.json manifest file in editor?.
+
+3. **Copy add-on files**  
+   - Replace the default `Code.gs` with the contents of `addon/Code.gs`.  
+   - Replace the default `appsscript.json` with the contents of `addon/appsscript.json` (or merge the `addOns` and `oauthScopes` sections into your existing manifest).
+
+4. **Set the backend URL**  
+   - In the Apps Script editor: **Project Settings** ? **Script Properties** ? Add property `BACKEND_URL` with value your backend base URL.  
+   - Examples:  
+     - Local: `http://127.0.0.1:8000`  
+     - Deployed: `https://your-backend.example.com`  
+   - If you don?t set `BACKEND_URL`, the add-on uses `http://127.0.0.1:8000`.
+
+5. **Install the add-on in Gmail**  
+   - Deploy the script as a **Test deployment** (Execute as ?Me?, install for ?Only myself? or your test account).  
+   - Open Gmail, open a message, then open the add-on from the right-hand panel.  
+   - Click **Scan for Phishing**; the add-on will send the message to the backend and show the result.
+
+**UI**
+
+- **Result**: label (Phishing / Suspicious / Safe) with a short color hint (Red / Orange / Green).  
+- **Confidence**: percentage.  
+- **Reasons**: list of explanations from the backend.  
+- If the backend used the LLM (for Suspicious emails), **LLM opinion** is shown: LLM label, confidence, and reasons.
+
+**CORS / local backend**
+
+If the backend runs on `http://127.0.0.1:8000`, the add-on (running in Google?s servers) cannot call it unless you expose the backend (e.g. ngrok or a deployed URL). For local development you can use a tunnel (e.g. `ngrok http 8000`) and set `BACKEND_URL` to the tunnel URL.
+
 ### How scoring works
 
 All tuning is in `backend/app/core/constants.py`.

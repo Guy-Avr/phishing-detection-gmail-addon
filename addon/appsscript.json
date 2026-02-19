@@ -1,0 +1,33 @@
+{
+  "timeZone": "Etc/GMT",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Phishing Detection",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/1x/gmail_48dp.png",
+      "layoutProperties": {
+        "primaryColor": "#1a73e8",
+        "secondaryColor": "#34a853"
+      },
+      "openLinkUrlPrefixes": [
+        "https://",
+        "http://localhost/",
+        "http://127.0.0.1/"
+      ]
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onGmailMessageOpen"
+        }
+      ]
+    }
+  }
+}
