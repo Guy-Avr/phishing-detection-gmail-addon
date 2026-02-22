@@ -5,7 +5,14 @@
   "runtimeVersion": "V8",
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.addons.execute",
-    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly"
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "urlFetchWhitelist": [
+    "https://*.ngrok.io/",
+    "https://*.ngrok-free.app/",
+    "https://*.ngrok-free.dev/",
+    "https://*.run.app/"
   ],
   "addOns": {
     "common": {

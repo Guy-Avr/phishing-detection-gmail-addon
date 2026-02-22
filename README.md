@@ -59,32 +59,35 @@ pytest
 
 ### Gmail Add-on
 
-The add-on lives in the `addon/` folder and works with the backend scan API. It does not run any detection itself; it sends the current email?s raw content to `POST /scan` and shows the result (label, confidence, reasons, and optional LLM opinion).
+The add-on lives in the `addon/` folder and works with the backend scan API. It does not run any detection itself; it sends the current email's raw content to `POST /scan` and shows the result (label, confidence, reasons, and optional LLM opinion).
+
+**Working with localhost:** The add-on runs on Google's servers and can only call **HTTPS** URLs. You cannot use `http://127.0.0.1:8000` directly. Use **ngrok** (or another tunnel) to expose your local backend over HTTPS, then set `BACKEND_URL` to that URL.
 
 **Setup**
 
-1. **Backend running**  
-   Start the backend (e.g. `uvicorn app.main:app --reload`) so it is reachable at a URL the add-on can call (see step 3).
+1. **Backend + tunnel (for localhost)**  
+   - Start the backend: `cd backend && uvicorn app.main:app --reload` (listens on `http://127.0.0.1:8000`).  
+   - In another terminal, run **ngrok**: `ngrok http 8000`.  
+   - Copy the **HTTPS** URL ngrok shows (e.g. `https://abc123.ngrok-free.app`). You will use it as `BACKEND_URL`.
 
 2. **Create an Apps Script project**  
    - Go to [script.google.com](https://script.google.com) and create a new project.  
-   - In Project Settings, enable ?Show appsscript.json manifest file in editor?.
+   - In **Project Settings**, enable **Show appsscript.json manifest file in editor**.
 
 3. **Copy add-on files**  
    - Replace the default `Code.gs` with the contents of `addon/Code.gs`.  
-   - Replace the default `appsscript.json` with the contents of `addon/appsscript.json` (or merge the `addOns` and `oauthScopes` sections into your existing manifest).
+   - Replace the default `appsscript.json` with the contents of `addon/appsscript.json` (so you get `oauthScopes`, `urlFetchWhitelist`, and `addOns`).
 
 4. **Set the backend URL**  
-   - In the Apps Script editor: **Project Settings** ? **Script Properties** ? Add property `BACKEND_URL` with value your backend base URL.  
-   - Examples:  
-     - Local: `http://127.0.0.1:8000`  
-     - Deployed: `https://your-backend.example.com`  
-   - If you don?t set `BACKEND_URL`, the add-on uses `http://127.0.0.1:8000`.
+   - In the Apps Script editor: **Project Settings** → **Script Properties** → Add property `BACKEND_URL`.  
+   - **Local (via ngrok):** set value to your ngrok HTTPS URL, e.g. `https://abc123.ngrok-free.app` (no trailing slash).  
+   - **Deployed backend:** set value to your API base URL, e.g. `https://your-backend.example.com`.  
+   - If you don't set `BACKEND_URL`, the add-on falls back to `http://127.0.0.1:8000` (which will fail from Google's servers).
 
 5. **Install the add-on in Gmail**  
-   - Deploy the script as a **Test deployment** (Execute as ?Me?, install for ?Only myself? or your test account).  
-   - Open Gmail, open a message, then open the add-on from the right-hand panel.  
-   - Click **Scan for Phishing**; the add-on will send the message to the backend and show the result.
+   - **Deploy** → **Test deployments** → **Install** → **Done**.  
+   - Open Gmail, open a **single email**, open the add-on from the right panel, click **Scan for Phishing**.  
+   - On first use, approve the permissions (including external requests).
 
 **UI**
 
@@ -93,9 +96,38 @@ The add-on lives in the `addon/` folder and works with the backend scan API. It 
 - **Reasons**: list of explanations from the backend.  
 - If the backend used the LLM (for Suspicious emails), **LLM opinion** is shown: LLM label, confidence, and reasons.
 
-**CORS / local backend**
+**Manifest notes**
 
-If the backend runs on `http://127.0.0.1:8000`, the add-on (running in Google?s servers) cannot call it unless you expose the backend (e.g. ngrok or a deployed URL). For local development you can use a tunnel (e.g. `ngrok http 8000`) and set `BACKEND_URL` to the tunnel URL.
+- `oauthScopes` includes `script.external_request` so the add-on can call `UrlFetchApp.fetch` to your backend.  
+- `urlFetchWhitelist` allows only **HTTPS** prefixes (e.g. `https://*.ngrok.io/`, `https://*.ngrok-free.app/`, `https://*.ngrok-free.dev/`). Google does not allow `http://localhost` in the whitelist.
+
+**Using ngrok (localhost)**
+
+To use the add-on with the backend running on your machine, expose it over HTTPS with ngrok:
+
+1. **Install ngrok**  
+   - Download from [ngrok.com](https://ngrok.com) (free sign-up) or install via package manager (e.g. `choco install ngrok` on Windows, `brew install ngrok` on macOS).
+
+2. **First-time setup (authtoken)**  
+   - Sign up at [dashboard.ngrok.com](https://dashboard.ngrok.com) and copy your **Authtoken**.  
+   - In a terminal: `ngrok config add-authtoken YOUR_TOKEN`.  
+   - Without this, ngrok may exit immediately or show an error.
+
+3. **Run ngrok**  
+   - Start the backend in one terminal: `cd backend && uvicorn app.main:app --reload`.  
+   - In a **second terminal** (keep it open): run `ngrok http 8000`.  
+   - Do not run ngrok by double-clicking; use an already-open terminal so you can see the URL and any errors.
+
+4. **Copy the HTTPS URL**  
+   - ngrok prints a line like: `Forwarding   https://xxxx.ngrok-free.app -> http://localhost:8000` (or `ngrok-free.dev`, `ngrok.io`).  
+   - Copy the **HTTPS** URL (e.g. `https://coleman-xxx.ngrok-free.dev`).
+
+5. **Configure the add-on**  
+   - In Apps Script: **Project Settings** → **Script Properties** → set `BACKEND_URL` to that URL (no trailing slash).  
+   - If your URL is on **ngrok-free.dev**, ensure `appsscript.json` includes `"https://*.ngrok-free.dev/"` in `urlFetchWhitelist` (the repo version already has it).
+
+6. **Keep ngrok running**  
+   - Leave the ngrok terminal open while testing. Closing it stops the tunnel and the add-on will no longer reach your backend.
 
 ### How scoring works
 
