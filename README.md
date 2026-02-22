@@ -49,6 +49,25 @@ The app will be available at **http://127.0.0.1:8000**
 
 - API docs (Swagger): http://127.0.0.1:8000/docs
 
+### Optional: LLM (Gemini or Ollama)
+
+The backend can use an LLM when the rule-based result is **Suspicious**. It is optional: if you don’t configure it, only the rule-based result is returned.
+
+Choose **one** provider via `.env` in the `backend` folder:
+
+**Ollama (local):**
+- `LLM_PROVIDER=ollama`
+- `OLLAMA_URL=http://localhost:11434` (default)
+- `OLLAMA_MODEL=llama2` (or another model you have)
+- **Ollama must be running on your machine** — either in the background via the [Ollama app](https://ollama.com) or by running `ollama serve` in a terminal (and `ollama pull llama2` if needed).
+
+**Gemini (Google):**
+- `LLM_PROVIDER=gemini`
+- `GEMINI_API_KEY=your_api_key`
+- `GEMINI_MODEL=gemini-1.5-flash` (default)
+
+Copy `backend/.env.example` to `backend/.env`, set `LLM_PROVIDER` and the variables for your chosen provider, then run the server as above. The LLM is invoked only for emails classified as Suspicious; Safe and Phishing stay rule-only.
+
 ### Run tests
 
 From the `backend` folder (with venv activated):
@@ -198,7 +217,7 @@ When the **rule-based verdict is Suspicious** (confidence between 0.4 and 0.7), 
 |----------------|-------------|
 | `LLM_PROVIDER` | `ollama` (default) or `gemini` |
 
-**Ollama** (local):
+**Ollama** (local): Ollama must be running on the machine — in the background via the [Ollama app](https://ollama.com) or by running `ollama serve` in a terminal.
 
 | Variable         | Default                  | Description        |
 |------------------|--------------------------|--------------------|
